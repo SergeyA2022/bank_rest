@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5435/bank_db
+    username: user
+    password: user
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  liquibase:
+    change-log: classpath:db/migration/db.changelog-master.xml
+
+jwt:
+  secret: 9a4f2c3535aef5441b1c1a1c1a1c1a1c1a1c1a1c1a1c1a1c1a1c1a1c1a1c1a1c # Длинная случайная строка
+  expiration: 86400000

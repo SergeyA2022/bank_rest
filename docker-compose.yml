@@ -1,0 +1,10 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: bank_db_container
+    environment:
+      POSTGRES_DB: bank_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user
+    ports:
+      - "5435:5432"
