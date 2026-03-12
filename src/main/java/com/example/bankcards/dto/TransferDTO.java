@@ -2,13 +2,11 @@ package com.example.bankcards.dto;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 import java.math.BigDecimal;
 
-@Getter
-@Setter
+@Data
 public class TransferDTO {
 
     @NotNull(message = "Debit card ID is required")

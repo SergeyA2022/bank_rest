@@ -1,5 +1,19 @@
 package com.example.bankcards.exception;
 
-public class CardOperationException extends  RuntimeException {
-    public CardOperationException(String message) { super(message); }
+import org.springframework.http.HttpStatus;
+
+public class CardOperationException extends BaseRestException {
+    public CardOperationException(String message) {
+        super(message);
+    }
+
+    @Override
+    HttpStatus getStatus() {
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    @Override
+    int getCode() {
+        return 400;
+    }
 }

@@ -4,6 +4,7 @@ import com.example.bankcards.dto.CardResponseDTO;
 import com.example.bankcards.dto.TransferDTO;
 import com.example.bankcards.entity.User;
 import com.example.bankcards.enums.Role;
+import com.example.bankcards.repository.UserRepository;
 import com.example.bankcards.security.JwtUtils;
 import com.example.bankcards.service.CardServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,27 +14,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.core.MethodParameter;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.support.WebDataBinderFactory;
-import org.springframework.web.context.request.NativeWebRequest;
-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
-import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -50,6 +43,9 @@ class UserControllerTest {
 
     @MockBean
     private CardServiceImpl cardService;
+
+    @MockBean
+    private UserRepository userRepository;
 
     @MockBean
     private JwtUtils jwtUtils;
@@ -69,28 +65,7 @@ class UserControllerTest {
         testUser.setUsername("test_user");
         testUser.setRole(Role.USER);
 
-        MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-        converter.setObjectMapper(new ObjectMapper()
-                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()));
-
-        mockMvc = MockMvcBuilders.standaloneSetup(new UserController(cardService))
-                .setCustomArgumentResolvers(
-                        new HandlerMethodArgumentResolver() {
-                            @Override
-                            public boolean supportsParameter(MethodParameter p) {
-                                return p.hasParameterAnnotation(AuthenticationPrincipal.class);
-                            }
-
-                            @Override
-                            public Object resolveArgument(MethodParameter p, ModelAndViewContainer m,
-                                                          NativeWebRequest w, WebDataBinderFactory f) {
-                                return testUser;
-                            }
-                        },
-                        new PageableHandlerMethodArgumentResolver()
-                )
-                .setMessageConverters(converter)
-                .build();
+        when(userRepository.findByUsername(any())).thenReturn(Optional.of(testUser));
     }
 
     @Test
@@ -100,7 +75,7 @@ class UserControllerTest {
         List<CardResponseDTO> content = new ArrayList<>();
         content.add(dto);
         Page<CardResponseDTO> page = new PageImpl<>(content, PageRequest.of(0, 5), 1);
-
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(cardService.getMyCards(eq(testUser.getId()), any(), any(Pageable.class)))
                 .thenReturn(page);
 
@@ -115,6 +90,8 @@ class UserControllerTest {
     @Test
     void blockMyCard_ShouldReturnSuccessMessage() throws Exception {
         Long cardId = 1L;
+
+        when(userRepository.findByUsername("test_user")).thenReturn(Optional.of(testUser));
         doNothing().when(cardService).blockMyCard(eq(cardId), eq(testUser.getId()));
 
         mockMvc.perform(patch("/api/user/cards/{id}/block", cardId))
@@ -129,6 +106,7 @@ class UserControllerTest {
         dto.setFromCardId(1L);
         dto.setToCardId(2L);
         dto.setAmount(new BigDecimal("100.00"));
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         doNothing().when(cardService).transferBetweenOwnCards(
                 eq(1L), eq(2L), any(BigDecimal.class), any(User.class)
         );
@@ -148,6 +126,7 @@ class UserControllerTest {
     void getBalance_ShouldReturnCardDto() throws Exception {
         CardResponseDTO response = new CardResponseDTO();
         response.setBalance(new BigDecimal("500.0"));
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(cardService.getCardBalance(anyLong(), any())).thenReturn(response);
 
         mockMvc.perform(get("/api/user/1/balance"))

@@ -2,20 +2,21 @@ package com.example.bankcards.service;
 
 import com.example.bankcards.dto.CardResponseDTO;
 import com.example.bankcards.entity.Card;
-import com.example.bankcards.enums.CardStatus;
 import com.example.bankcards.entity.User;
+import com.example.bankcards.enums.CardStatus;
 import com.example.bankcards.exception.CardOperationException;
 import com.example.bankcards.exception.InsufficientFundsException;
+import com.example.bankcards.mapper.CardMapper;
 import com.example.bankcards.repository.CardRepository;
 import com.example.bankcards.repository.UserRepository;
-import com.example.bankcards.mapper.CardMapper;
+import com.example.bankcards.util.CardUtils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -71,7 +72,7 @@ public class CardServiceImpl implements CardService {
         cardRepository.deleteById(cardId);
     }
 
-    public Page<CardResponseDTO> getAllCards(CardStatus status,Pageable pageable) {
+    public Page<CardResponseDTO> getAllCards(CardStatus status, Pageable pageable) {
         if (status != null) {
             return cardRepository.findAllByStatus(status, pageable).map(cardMapper::toDto);
         }
@@ -129,7 +130,7 @@ public class CardServiceImpl implements CardService {
         }
 
         if (cardFrom.getBalance().compareTo(amount) < 0) {
-            throw new InsufficientFundsException("Insufficient funds on the card " + cardFrom.getCardNumber());
+            throw new InsufficientFundsException("Insufficient funds on the card " + CardUtils.mask(cardFrom.getCardNumber()));
         }
 
         if (cardFrom.getExpiryDate().isBefore(LocalDate.now())) {

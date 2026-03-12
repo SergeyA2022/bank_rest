@@ -57,7 +57,7 @@ class AdminControllerTest {
     @Test
     void access_Denied_For_Anonymous() throws Exception {
         mockMvc.perform(get("/api/admin/cards"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
