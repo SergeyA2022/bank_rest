@@ -8,3 +8,24 @@ services:
       POSTGRES_PASSWORD: user
     ports:
       - "5435:5432"
+    networks:
+      - bank_network
+
+  app:
+    build: .
+    container_name: bank_app_container
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/bank_db
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: user
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    networks:
+      - bank_network
+
+networks:
+  bank_network:
+    driver: bridge
