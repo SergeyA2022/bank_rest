@@ -17,27 +17,54 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 
+/**
+ * Основной конфигурационный класс для настройки безопасности Spring Security.
+ * Определяет правила доступа к эндпоинтам, конфигурацию CORS,
+ * политику сессий и цепочку фильтров аутентификации.
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    /** Фильтр для обработки и валидации JWT токенов в каждом запросе */
     private final JwtFilter jwtFilter;
 
+    /** Внедряем список ORIGINS (адреса) */
+    @Value("${app.security.cors.allowed-origins}")
+    private List<String> allowedOrigins;
+
+    /** Внедряем список METHODS (GET, POST и т.д.) */
+    @Value("${app.security.cors.allowed-methods}")
+    private List<String> allowedMethods;
+
+    /**
+     * Создает бин для шифрования паролей с использованием алгоритма BCrypt.
+     * Используется при регистрации и авторизации пользователей.
+     *
+     * @return объект PasswordEncoder
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Конфигурирует правила Cross-Origin Resource Sharing (CORS).
+     * Разрешает запросы с локальных адресов и определяет допустимые HTTP-методы и заголовки.
+     *
+     * @return источник конфигурации CORS
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:8080", "http://127.0.0.1:8080"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(allowedMethods);
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         configuration.setAllowCredentials(true);
 
@@ -46,6 +73,14 @@ public class SecurityConfig {
         return source;
     }
 
+    /**
+     * Настраивает основную цепочку фильтров безопасности (Security Filter Chain).
+     *
+     * @param http объект для настройки HTTP безопасности
+     * @param authEntryPoint кастомная точка входа для обработки ошибок аутентификации (401)
+     * @return настроенная цепочка фильтров
+     * @throws Exception при ошибках конфигурации
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, CustomAuthenticationEntryPoint authEntryPoint) throws Exception {
         http
@@ -65,6 +100,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
                 );
+        // Установка кастомного JWT фильтра перед стандартным фильтром аутентификации
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

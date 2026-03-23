@@ -7,12 +7,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.util.List;
 
+/**
+ * Интерфейс сервиса для управления банковскими картами.
+ * Определяет бизнес-логику для операций выпуска, блокировки, переводов
+ * и администрирования карт.
+ */
 public interface CardService {
 
     CardResponseDTO createCard(Long userId);
-
-    CardResponseDTO createCardForUser(Long userId);
 
     String generateRandomCardNumber();
 

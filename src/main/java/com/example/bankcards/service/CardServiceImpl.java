@@ -22,6 +22,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Random;
 
+/**
+ * Реализация сервиса управления банковскими картами.
+ * Обеспечивает бизнес-логику для создания, блокировки, удаления карт,
+ * а также проведения межбанковских переводов между счетами пользователя.
+ */
 @Service
 @RequiredArgsConstructor
 public class CardServiceImpl implements CardService {
@@ -30,11 +35,16 @@ public class CardServiceImpl implements CardService {
     private final UserRepository userRepository;
     private final CardMapper cardMapper;
 
+    /**
+     * Внутренний метод инициализации новой карты с генерацией случайного номера.
+     * Карта выпускается со сроком действия 5 лет и нулевым балансом.
+     *
+     * @param userId идентификатор пользователя
+     * @return DTO созданной карты
+     * @throws EntityNotFoundException если пользователь не найден
+     */
+    @Override
     public CardResponseDTO createCard(Long userId) {
-        return createCardForUser(userId);
-    }
-
-    public CardResponseDTO createCardForUser(Long userId) {
         User owner = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
         String fullNumber = generateRandomCardNumber();
@@ -49,6 +59,12 @@ public class CardServiceImpl implements CardService {
         return cardMapper.toDto(savedCard);
     }
 
+    /**
+     * Генерирует случайную последовательность из 16 цифр для номера карты.
+     *
+     * @return 16-значная строка номера карты
+     */
+    @Override
     public String generateRandomCardNumber() {
         Random random = new Random();
         StringBuilder sb = new StringBuilder();
@@ -58,6 +74,14 @@ public class CardServiceImpl implements CardService {
         return sb.toString();
     }
 
+    /**
+     * Обновляет административный статус карты.
+     *
+     * @param cardId    идентификатор карты
+     * @param newStatus новый целевой статус
+     * @throws EntityNotFoundException если карта не найдена
+     */
+    @Override
     public void updateCardStatus(Long cardId, CardStatus newStatus) {
         Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new EntityNotFoundException("The card was not found"));
@@ -65,6 +89,13 @@ public class CardServiceImpl implements CardService {
         cardRepository.save(card);
     }
 
+    /**
+     * Удаляет карту из системы по её идентификатору.
+     *
+     * @param cardId идентификатор карты
+     * @throws EntityNotFoundException если карта не найдена
+     */
+    @Override
     public void deleteCard(Long cardId) {
         if (!cardRepository.existsById(cardId)) {
             throw new EntityNotFoundException("The card was not found");
@@ -72,6 +103,15 @@ public class CardServiceImpl implements CardService {
         cardRepository.deleteById(cardId);
     }
 
+    /**
+     * Возвращает список всех карт в системе с поддержкой пагинации.
+     * Используется администраторами.
+     *
+     * @param status   необязательный фильтр по статусу
+     * @param pageable параметры пагинации
+     * @return страница с данными карт
+     */
+    @Override
     public Page<CardResponseDTO> getAllCards(CardStatus status, Pageable pageable) {
         if (status != null) {
             return cardRepository.findAllByStatus(status, pageable).map(cardMapper::toDto);
@@ -79,6 +119,15 @@ public class CardServiceImpl implements CardService {
         return cardRepository.findAll(pageable).map(cardMapper::toDto);
     }
 
+    /**
+     * Позволяет пользователю самостоятельно заблокировать свою карту.
+     * Операция выполняется транзакционно с проверкой прав владения.
+     *
+     * @param cardId идентификатор карты
+     * @param userId идентификатор текущего пользователя
+     * @throws AccessDeniedException если пользователь не является владельцем карты
+     */
+    @Override
     @Transactional
     public void blockMyCard(Long cardId, Long userId) {
         Card card = cardRepository.findById(cardId)
@@ -92,6 +141,15 @@ public class CardServiceImpl implements CardService {
         cardRepository.save(card);
     }
 
+    /**
+     * Возвращает список карт, принадлежащих конкретному пользователю.
+     *
+     * @param userId   идентификатор владельца
+     * @param status   необязательный фильтр по статусу
+     * @param pageable параметры пагинации
+     * @return страница с картами пользователя
+     */
+    @Override
     public Page<CardResponseDTO> getMyCards(Long userId, CardStatus status, Pageable pageable) {
         Page<Card> cards;
 
@@ -103,12 +161,26 @@ public class CardServiceImpl implements CardService {
         return cards.map(cardMapper::toDto);
     }
 
+    /**
+     * Выполняет межбанковский перевод между собственными картами пользователя.
+     * Использует пессимистические блокировки БД для предотвращения race condition.
+     * Блокировка ресурсов происходит в строго определенном порядке (по ID) для защиты от Deadlocks.
+     *
+     * @param fromCardId  ID карты списания
+     * @param toCardId    ID карты зачисления
+     * @param amount      сумма перевода
+     * @param currentUser текущий аутентифицированный пользователь
+     * @throws CardOperationException если нарушены условия перевода (просрочена карта, не свой счет)
+     * @throws InsufficientFundsException если баланс карты отправителя меньше суммы перевода
+     */
+    @Override
     @Transactional
     public void transferBetweenOwnCards(Long fromCardId, Long toCardId, BigDecimal amount, User currentUser) {
         if (fromCardId.equals(toCardId)) {
             throw new CardOperationException("Cannot transfer money to the same card");
         }
 
+        // Порядок блокировки по возрастанию ID для предотвращения взаимных блокировок
         Long firstId = Math.min(fromCardId, toCardId);
         Long secondId = Math.max(fromCardId, toCardId);
 
@@ -146,6 +218,15 @@ public class CardServiceImpl implements CardService {
         cardRepository.save(cardTo);
     }
 
+    /**
+     * Получение детальной информации о балансе конкретной карты.
+     *
+     * @param cardId идентификатор карты
+     * @param userId идентификатор пользователя для проверки доступа
+     * @return DTO с информацией о карте
+     * @throws AccessDeniedException если пользователь пытается просмотреть чужую карту
+     */
+    @Override
     public CardResponseDTO getCardBalance(Long cardId, Long userId) {
         Card card = cardRepository.findById(cardId)
                 .orElseThrow(() -> new EntityNotFoundException("he card was not found"));
